@@ -24,9 +24,9 @@ const PRESENTER_WEIGHT = 0.35;
 const SCI_WEIGHT = 3.0;
 const OPP_WEIGHT = 2.0;
 const REV_WEIGHT = 1.0;
-const LENIENCY_MIN = 0.7;  // Tighter bounds
-const LENIENCY_MAX = 1.4;
-const LENIENCY_DAMPING = 0.5; // 50% correction only
+const LENIENCY_MIN = 0.6;  // Tighter bounds
+const LENIENCY_MAX = 1.5;
+const LENIENCY_DAMPING = 0.3; // 50% correction only
 
 const GRADE_MAP = {
     "2": 2.0, "3-": 5.0, "3": 9.0, "3+": 14.0, "4-": 20.0,
