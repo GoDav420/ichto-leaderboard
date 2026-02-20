@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "compile-cpp": "g++ -std=c++17 -O2 -o score_calculator score_calculator.cpp"
+    "compile-cpp": "g++ -std=c++17 -O2 -o score_calculator score_calculator.cpp",
+    "postinstall": "npm run compile-cpp"
   },
   "keywords": ["leaderboard", "ichto", "competition"],
   "author": "Your Name",
