@@ -11,11 +11,11 @@
 // Configuration Constants (FIXED LASS)
 // ============================================
 const double PRESENTER_WEIGHT = 0.35;
-const double SCI_WEIGHT = 3.0;
+const double SCI_WEIGHT = 2.0;
 const double OPP_WEIGHT = 2.0;
 const double REV_WEIGHT = 1.0;
-const double LENIENCY_MIN = 0.7;
-const double LENIENCY_MAX = 1.4;
+const double LENIENCY_MIN = 0.5;
+const double LENIENCY_MAX = 1.5;
 const double LENIENCY_DAMPING = 0.5; // Only apply 50% of correction
 
 // Grade conversion map
