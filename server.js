@@ -21,7 +21,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'competition-secret-key';
 // Configuration Constants
 // ============================================
 const PRESENTER_WEIGHT = 0.35;
-const SCI_WEIGHT = 3.0;
+const SCI_WEIGHT = 2.0;
 const OPP_WEIGHT = 2.0;
 const REV_WEIGHT = 1.0;
 const LENIENCY_MIN = 0.6;  // Tighter bounds
