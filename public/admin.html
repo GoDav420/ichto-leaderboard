@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - IChTo Leaderboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="admin-body">
+    <!-- Login Modal -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <h2>🔐 Admin Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Login</button>
+                <p class="error-message" id="loginError"></p>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Admin Panel -->
+    <div class="admin-container" id="adminPanel" style="display: none;">
+        <header class="admin-header">
+            <h1>⚙️ Admin Panel</h1>
+            <div class="header-actions">
+                <a href="/" class="btn btn-secondary">View Leaderboard</a>
+                <button class="btn btn-danger" id="logoutBtn">Logout</button>
+            </div>
+        </header>
+        
+        <div class="admin-content">
+            <!-- Sections Management -->
+            <section class="admin-section">
+                <h2>📁 Sections Management</h2>
+                <p class="help-text">Create sections first. Teams in the same section are compared for leniency adjustment.</p>
+                <form id="sectionForm" class="form-grid">
+                    <div class="form-group">
+                        <label for="sectionName">Section Name *</label>
+                        <input type="text" id="sectionName" required placeholder="e.g., Section 1, Group A">
+                    </div>
+                    <div class="form-group form-action">
+                        <button type="submit" class="btn btn-primary">Add Section</button>
+                    </div>
+                </form>
+                <div class="sections-list" id="sectionsList">
+                    <p class="loading-text">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Teams Management -->
+            <section class="admin-section">
+                <h2>👥 Teams Management</h2>
+                <form id="teamForm" class="form-grid">
+                    <div class="form-group">
+                        <label for="teamName">Team Name *</label>
+                        <input type="text" id="teamName" required placeholder="Team name">
+                    </div>
+                    <div class="form-group">
+                        <label for="nationality">Country Code *</label>
+                        <input type="text" id="nationality" required placeholder="USA, GER, JPN">
+                    </div>
+                    <div class="form-group">
+                        <label for="teamSection">Section</label>
+                        <select id="teamSection">
+                            <option value="">No Section</option>
+                        </select>
+                    </div>
+                    <div class="form-group form-action">
+                        <button type="submit" class="btn btn-primary">Add Team</button>
+                    </div>
+                </form>
+                <div class="teams-list" id="teamsList">
+                    <p class="loading-text">Loading...</p>
+                </div>
+            </section>
+            
+            <!-- Bulk Grades Upload -->
+            <section class="admin-section">
+                <h2>📝 Bulk Upload Grades</h2>
+                <div class="format-help">
+                    <h4>Format (Auto-creates sections and teams):</h4>
+                    <code>SectionName|TeamName|Country:reporter_sci:grades,reporter_pres:grades,opponent:grades,reviewer:grades</code>
+                    <p class="help-text"><strong>Example:</strong></p>
+                    <code>Section 1|AlphaTeam|USA:reporter_sci:4+ 5- 4 4+ 5,reporter_pres:4 4+ 4- 4 4,opponent:4- 4 4 3+ 4,reviewer:3+ 4- 4 4 3+</code>
+                    <p class="help-text">
+                        • Multiple teams: separate with semicolon (;)<br>
+                        • Grades: space-separated jury scores<br>
+                        • Roles: reporter_sci, reporter_pres, opponent, reviewer
+                    </p>
+                </div>
+                <form id="gradesForm">
+                    <div class="form-group">
+                        <textarea id="gradesString" rows="6" 
+                            placeholder="Section 1|TeamName|USA:reporter_sci:4+ 5-,reporter_pres:4 4+,opponent:4- 4,reviewer:3+ 4"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload Grades</button>
+                </form>
+            </section>
+            
+            <!-- Individual Grade Entry -->
+            <section class="admin-section">
+                <h2>📊 Add Single Grade</h2>
+                <form id="singleGradeForm" class="form-grid">
+                    <div class="form-group">
+                        <label for="gradeTeamId">Team *</label>
+                        <select id="gradeTeamId" required>
+                            <option value="">Select team</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="gradeTask">Role *</label>
+                        <select id="gradeTask" required>
+                            <option value="">Select role</option>
+                            <option value="reporter_sci">Reporter (Scientific)</option>
+                            <option value="reporter_pres">Reporter (Presentation)</option>
+                            <option value="opponent">Opponent</option>
+                            <option value="reviewer">Reviewer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="gradeValue">Jury Grades *</label>
+                        <input type="text" id="gradeValue" required placeholder="4+ 5- 4 4+ 5">
+                    </div>
+                    <div class="form-group form-action">
+                        <button type="submit" class="btn btn-primary">Add Grade</button>
+                    </div>
+                </form>
+            </section>
+            
+            <!-- Scoring Info -->
+            <section class="admin-section">
+                <h2>ℹ️ LASS Scoring System</h2>
+                <div class="scoring-info">
+                    <div class="scoring-grid">
+                        <div>
+                            <h4>Grade Scale</h4>
+                            <table class="grades-table compact-table">
+                                <tbody>
+                                    <tr><td>2</td><td>2.0</td><td>4-</td><td>20.0</td></tr>
+                                    <tr><td>3-</td><td>5.0</td><td>4</td><td>27.0</td></tr>
+                                    <tr><td>3</td><td>9.0</td><td>4+</td><td>34.0</td></tr>
+                                    <tr><td>3+</td><td>14.0</td><td>5-</td><td>42.0</td></tr>
+                                    <tr><td></td><td></td><td>5</td><td>51.0</td></tr>
+                                    <tr><td></td><td></td><td>5+</td><td>60.0</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h4>TP Calculation</h4>
+                            <p class="help-text">
+                                <code>TP = 3×(Sci + 0.35×Pres) + 2×Opp + 1×Rev</code><br><br>
+                                • Scores trimmed (remove high/low if 3+ jurors)<br>
+                                • Adjusted by section leniency factor<br>
+                                • Lenient juries → scores reduced<br>
+                                • Harsh juries → scores boosted
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Grades Overview -->
+            <section class="admin-section">
+                <h2>📋 Grades Overview</h2>
+                <div class="grades-overview" id="gradesOverview">
+                    <p class="loading-text">Loading...</p>
+                </div>
+            </section>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

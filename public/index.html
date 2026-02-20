@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IChTo 2025 Leaderboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏆 IChTo 2025 Leaderboard</h1>
+            <div class="header-info">
+                <span class="live-indicator">
+                    <span class="pulse"></span>
+                    LIVE
+                </span>
+                <span class="update-time" id="lastUpdate">Last update: --</span>
+            </div>
+        </header>
+        
+        <div class="leaderboard-container">
+            <table class="leaderboard">
+                <thead>
+                    <tr>
+                        <th class="place-col">Place</th>
+                        <th class="team-col">Team</th>
+                        <th class="nationality-col">Country</th>
+                        <th class="section-col">Section</th>
+                        <th class="tp-col">TP</th>
+                        <th class="rp-col">RP</th>
+                        <th class="tasks-col">Presented Tasks</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody">
+                    <tr class="loading-row">
+                        <td colspan="7">Loading leaderboard...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <footer>
+            <p>Scores calculated using Leniency-Adjusted Scoring System (LASS)</p>
+            <a href="/admin" class="admin-link">Admin Panel</a>
+        </footer>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/leaderboard.js"></script>
+</body>
+</html>

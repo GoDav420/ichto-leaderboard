@@ -1,0 +1,6 @@
+node_modules/
+.env
+data/teams.json
+score_calculator
+*.o
+.DS_Store
