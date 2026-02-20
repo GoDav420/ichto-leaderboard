@@ -1,6 +1,10 @@
 node_modules/
+package-lock.json
 .env
 data/teams.json
 score_calculator
+score_calculator.exe
 *.o
+*.out
 .DS_Store
+Thumbs.db

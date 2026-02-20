@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["gcc"]
+
+[phases.build]
+cmds = ["npm install", "npm run compile-cpp || echo 'C++ compilation failed, using fallback'"]
+
+[start]
+cmd = "npm start"
