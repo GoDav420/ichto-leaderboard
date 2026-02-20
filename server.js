@@ -361,13 +361,22 @@ app.get('/admin', (req, res) => {
 app.post('/api/login', (req, res) => {
     const { password } = req.body;
     
+    console.log('Login attempt - Password provided:', !!password);
+    console.log('Expected password:', ADMIN_PASSWORD);
+    console.log('Match:', password === ADMIN_PASSWORD);
+    
     if (password === ADMIN_PASSWORD) {
         req.session.isAdmin = true;
         req.session.save((err) => {
-            if (err) return res.status(500).json({ error: 'Session error' });
+            if (err) {
+                console.error('Session save error:', err);
+                return res.status(500).json({ error: 'Session error' });
+            }
+            console.log('Login successful, session saved');
             res.json({ success: true });
         });
     } else {
+        console.log('Invalid password attempt');
         res.status(401).json({ error: 'Invalid password' });
     }
 });
