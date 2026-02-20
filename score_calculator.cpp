@@ -8,14 +8,15 @@
 #include <map>
 
 // ============================================
-// Configuration Constants (LASS)
+// Configuration Constants (LASS) - FIXED
 // ============================================
 const double PRESENTER_WEIGHT = 0.35;
 const double SCI_WEIGHT = 3.0;
 const double OPP_WEIGHT = 2.0;
 const double REV_WEIGHT = 1.0;
-const double LENIENCY_MIN = 0.6;
-const double LENIENCY_MAX = 1.5;
+const double LENIENCY_MIN = 0.7;
+const double LENIENCY_MAX = 1.4;
+const double LENIENCY_DAMPING = 0.5;  // Only apply 50% of the correction
 
 // Grade conversion map
 std::map<std::string, double> GRADE_MAP = {
@@ -28,8 +29,8 @@ std::map<std::string, double> GRADE_MAP = {
 // ============================================
 struct Grade {
     std::string role;
-    std::vector<double> scores;  // Individual juror scores
-    std::string rawGradeStr;     // Original grade string
+    std::vector<double> scores;
+    std::string rawGradeStr;
 };
 
 struct TeamData {
@@ -40,18 +41,17 @@ struct TeamData {
     std::string sectionName;
     std::vector<Grade> grades;
     
-    // Raw scores (before leniency adjustment)
     double sci_raw = 0.0;
     double rep_raw = 0.0;
     double opp_raw = 0.0;
     double rev_raw = 0.0;
     
-    // Adjusted scores (after leniency adjustment)
     double sci = 0.0;
     double rep = 0.0;
     double opp = 0.0;
     double rev = 0.0;
     
+    double rawTP = 0.0;
     double TP = 0.0;
     double RP = 0.0;
     double z_score = 0.0;
@@ -64,17 +64,12 @@ struct SectionData {
     std::string sectionName;
     std::vector<TeamData*> teams;
     double mean_raw_score = 0.0;
-    double std_raw_score = 0.0;
-    double mean_tp = 0.0;
-    double std_tp = 0.0;
     double leniency_coefficient = 1.0;
-    int jury_count = 0;
 };
 
 // ============================================
 // Utility Functions
 // ============================================
-
 double convertGrade(const std::string& score) {
     if (GRADE_MAP.count(score)) {
         return GRADE_MAP[score];
@@ -104,28 +99,21 @@ std::vector<double> parseGradeString(const std::string& gradesStr) {
 double getTrimmedAverage(const std::vector<double>& scores, double leniency = 1.0) {
     if (scores.empty()) return 0.0;
     
-    std::vector<double> adjusted;
-    for (double s : scores) {
-        adjusted.push_back(s / leniency);
+    std::vector<double> sorted = scores;
+    std::sort(sorted.begin(), sorted.end());
+    
+    // Trim if 3+ scores
+    if (sorted.size() >= 3) {
+        sorted.erase(sorted.begin());  // Remove min
+        sorted.pop_back();              // Remove max
     }
     
-    std::sort(adjusted.begin(), adjusted.end());
-    
-    // If 3+ scores, trim highest and lowest
-    if (adjusted.size() >= 3) {
-        double sum = 0.0;
-        int count = 0;
-        for (size_t i = 1; i < adjusted.size() - 1; i++) {
-            sum += adjusted[i];
-            count++;
-        }
-        return count > 0 ? sum / count : 0.0;
-    }
-    
-    // Otherwise, just average
     double sum = 0.0;
-    for (double s : adjusted) sum += s;
-    return sum / adjusted.size();
+    for (double s : sorted) sum += s;
+    double avg = sorted.empty() ? 0.0 : sum / sorted.size();
+    
+    // Apply leniency adjustment
+    return avg / leniency;
 }
 
 std::string escapeJson(const std::string& str) {
@@ -152,23 +140,18 @@ std::string trim(const std::string& str) {
 
 // ============================================
 // Parse Input
-// Format: sectionId|sectionName|teamId|teamName|nationality|role:grades,role:grades
 // ============================================
 TeamData parseTeamData(const std::string& line) {
     TeamData team;
     std::stringstream ss(line);
     std::string token;
     
-    // Parse section info
     std::getline(ss, team.sectionId, '|');
     std::getline(ss, team.sectionName, '|');
-    
-    // Parse team info
     std::getline(ss, team.teamId, '|');
     std::getline(ss, team.teamName, '|');
     std::getline(ss, team.nationality, '|');
     
-    // Parse grades
     std::string gradesStr;
     std::getline(ss, gradesStr);
     
@@ -194,89 +177,12 @@ TeamData parseTeamData(const std::string& line) {
 }
 
 // ============================================
-// Calculate Section Statistics
-// ============================================
-void calculateSectionStatistics(SectionData& section) {
-    if (section.teams.empty()) return;
-    
-    // Collect all raw scores
-    std::vector<double> allScores;
-    int maxJurors = 0;
-    
-    for (TeamData* team : section.teams) {
-        for (const Grade& g : team->grades) {
-            for (double score : g.scores) {
-                allScores.push_back(score);
-            }
-            if (g.scores.size() > maxJurors) {
-                maxJurors = g.scores.size();
-            }
-        }
-    }
-    
-    section.jury_count = maxJurors;
-    
-    if (allScores.empty()) return;
-    
-    // Calculate mean
-    double sum = 0.0;
-    for (double s : allScores) sum += s;
-    section.mean_raw_score = sum / allScores.size();
-    
-    // Calculate standard deviation
-    double variance = 0.0;
-    for (double s : allScores) {
-        variance += (s - section.mean_raw_score) * (s - section.mean_raw_score);
-    }
-    section.std_raw_score = std::sqrt(variance / allScores.size());
-}
-
-// ============================================
-// Process Team Scores with Leniency
-// ============================================
-void processTeamScores(TeamData& team, double leniency) {
-    team.leniency = leniency;
-    
-    // Find scores for each role
-    std::vector<double> sciScores, repScores, oppScores, revScores;
-    
-    for (const Grade& g : team.grades) {
-        if (g.role == "reporter_sci" || g.role == "sci") {
-            sciScores = g.scores;
-        } else if (g.role == "reporter_pres" || g.role == "rep" || g.role == "pres") {
-            repScores = g.scores;
-        } else if (g.role == "opponent" || g.role == "opp") {
-            oppScores = g.scores;
-        } else if (g.role == "reviewer" || g.role == "rev") {
-            revScores = g.scores;
-        }
-    }
-    
-    // Calculate raw scores (no leniency adjustment)
-    team.sci_raw = getTrimmedAverage(sciScores, 1.0);
-    team.rep_raw = getTrimmedAverage(repScores, 1.0);
-    team.opp_raw = getTrimmedAverage(oppScores, 1.0);
-    team.rev_raw = getTrimmedAverage(revScores, 1.0);
-    
-    // Calculate adjusted scores (with leniency)
-    team.sci = getTrimmedAverage(sciScores, leniency);
-    team.rep = getTrimmedAverage(repScores, leniency);
-    team.opp = getTrimmedAverage(oppScores, leniency);
-    team.rev = getTrimmedAverage(revScores, leniency);
-    
-    // Calculate TP using LASS formula
-    team.TP = SCI_WEIGHT * (team.sci + team.rep * PRESENTER_WEIGHT) 
-            + (OPP_WEIGHT * team.opp) 
-            + (REV_WEIGHT * team.rev);
-}
-
-// ============================================
-// Main Processing Function
+// Process All Teams with FIXED LASS
 // ============================================
 void processAllTeams(std::vector<TeamData>& teams) {
     if (teams.empty()) return;
     
-    // Group teams by section
+    // Group by section
     std::map<std::string, SectionData> sections;
     
     for (TeamData& team : teams) {
@@ -290,97 +196,123 @@ void processAllTeams(std::vector<TeamData>& teams) {
         sections[secId].teams.push_back(&team);
     }
     
-    // Calculate statistics for each section
+    // Calculate section means
+    std::vector<double> allGlobalScores;
+    
     for (auto& pair : sections) {
-        calculateSectionStatistics(pair.second);
-    }
-    
-    // Calculate global mean raw score
-    double globalSum = 0.0;
-    double globalCount = 0.0;
-    
-    for (const auto& pair : sections) {
-        for (TeamData* team : pair.second.teams) {
+        SectionData& section = pair.second;
+        std::vector<double> sectionScores;
+        
+        for (TeamData* team : section.teams) {
             for (const Grade& g : team->grades) {
                 for (double score : g.scores) {
-                    globalSum += score;
-                    globalCount += 1.0;
+                    sectionScores.push_back(score);
+                    allGlobalScores.push_back(score);
                 }
             }
         }
+        
+        if (!sectionScores.empty()) {
+            double sum = 0.0;
+            for (double s : sectionScores) sum += s;
+            section.mean_raw_score = sum / sectionScores.size();
+        }
     }
     
-    double globalMean = globalCount > 0 ? globalSum / globalCount : 0.0;
+    // Global mean
+    double globalMean = 27.0;
+    if (!allGlobalScores.empty()) {
+        double sum = 0.0;
+        for (double s : allGlobalScores) sum += s;
+        globalMean = sum / allGlobalScores.size();
+    }
     
-    // Calculate leniency coefficient for each section
+    // Calculate DAMPENED leniency
     for (auto& pair : sections) {
         SectionData& section = pair.second;
         
         if (globalMean > 0 && section.mean_raw_score > 0) {
-            section.leniency_coefficient = section.mean_raw_score / globalMean;
+            double rawRatio = section.mean_raw_score / globalMean;
+            // Apply damping: only 50% correction
+            section.leniency_coefficient = 1.0 + (rawRatio - 1.0) * LENIENCY_DAMPING;
         } else {
             section.leniency_coefficient = 1.0;
         }
         
-        // Clamp leniency
+        // Clamp
         section.leniency_coefficient = std::max(LENIENCY_MIN, 
             std::min(LENIENCY_MAX, section.leniency_coefficient));
+        
+        std::cerr << "Section " << section.sectionName 
+                  << " - Mean: " << section.mean_raw_score
+                  << " - Leniency: " << section.leniency_coefficient << std::endl;
     }
     
-    // Process each team with section leniency
+    // Process each team
     for (auto& pair : sections) {
         SectionData& section = pair.second;
         
         for (TeamData* team : section.teams) {
-            processTeamScores(*team, section.leniency_coefficient);
+            team->leniency = section.leniency_coefficient;
+            
+            std::vector<double> sciScores, repScores, oppScores, revScores;
+            
+            for (const Grade& g : team->grades) {
+                if (g.role == "reporter_sci") sciScores = g.scores;
+                else if (g.role == "reporter_pres") repScores = g.scores;
+                else if (g.role == "opponent") oppScores = g.scores;
+                else if (g.role == "reviewer") revScores = g.scores;
+            }
+            
+            // Raw scores
+            team->sci_raw = getTrimmedAverage(sciScores, 1.0);
+            team->rep_raw = getTrimmedAverage(repScores, 1.0);
+            team->opp_raw = getTrimmedAverage(oppScores, 1.0);
+            team->rev_raw = getTrimmedAverage(revScores, 1.0);
+            
+            // Adjusted scores
+            team->sci = getTrimmedAverage(sciScores, section.leniency_coefficient);
+            team->rep = getTrimmedAverage(repScores, section.leniency_coefficient);
+            team->opp = getTrimmedAverage(oppScores, section.leniency_coefficient);
+            team->rev = getTrimmedAverage(revScores, section.leniency_coefficient);
+            
+            // Calculate TP
+            team->rawTP = SCI_WEIGHT * (team->sci_raw + team->rep_raw * PRESENTER_WEIGHT) 
+                        + (OPP_WEIGHT * team->opp_raw) 
+                        + (REV_WEIGHT * team->rev_raw);
+                        
+            team->TP = SCI_WEIGHT * (team->sci + team->rep * PRESENTER_WEIGHT) 
+                     + (OPP_WEIGHT * team->opp) 
+                     + (REV_WEIGHT * team->rev);
         }
-        
-        // Calculate section TP statistics
-        double tpSum = 0.0;
-        for (TeamData* team : section.teams) {
-            tpSum += team->TP;
-        }
-        section.mean_tp = section.teams.empty() ? 0.0 : tpSum / section.teams.size();
-        
-        double tpVariance = 0.0;
-        for (TeamData* team : section.teams) {
-            tpVariance += std::pow(team->TP - section.mean_tp, 2);
-        }
-        section.std_tp = section.teams.empty() ? 0.0 : 
-            std::sqrt(tpVariance / section.teams.size());
     }
     
-    // Calculate global TP statistics for Z-score
-    double globalTpSum = 0.0;
-    double teamCount = 0.0;
-    
-    for (TeamData& team : teams) {
-        globalTpSum += team.TP;
-        teamCount += 1.0;
+    // Calculate global TP stats
+    double tpSum = 0.0;
+    for (const TeamData& team : teams) {
+        tpSum += team.TP;
     }
+    double globalMeanTp = teams.empty() ? 0.0 : tpSum / teams.size();
     
-    double globalMeanTp = teamCount > 0 ? globalTpSum / teamCount : 0.0;
-    
-    double globalTpVariance = 0.0;
-    for (TeamData& team : teams) {
-        globalTpVariance += std::pow(team.TP - globalMeanTp, 2);
+    double tpVariance = 0.0;
+    for (const TeamData& team : teams) {
+        tpVariance += std::pow(team.TP - globalMeanTp, 2);
     }
-    double globalStdTp = teamCount > 0 ? std::sqrt(globalTpVariance / teamCount) : 1.0;
+    double globalStdTp = teams.empty() ? 1.0 : std::sqrt(tpVariance / teams.size());
     if (globalStdTp < 1.0) globalStdTp = 1.0;
     
-    // Calculate Z-score and RP for each team
+    // Calculate Z-score and RP
     for (TeamData& team : teams) {
         team.z_score = (team.TP - globalMeanTp) / globalStdTp;
-        // RP normalized to nice range (50 ± 10*z)
         team.RP = 50.0 + (team.z_score * 10.0);
     }
     
-    // Sort by RP descending
+    // Sort by RP
     std::sort(teams.begin(), teams.end(), [](const TeamData& a, const TeamData& b) {
         return a.RP > b.RP;
     });
     
-    // Assign places (handle ties)
+    // Assign places
     int currentPlace = 1;
     for (size_t i = 0; i < teams.size(); i++) {
         if (i > 0 && std::abs(teams[i].RP - teams[i-1].RP) < 0.01) {
@@ -411,7 +343,6 @@ void outputJSON(std::vector<TeamData>& teams) {
         std::cout << "\n    \"sectionId\": \"" << escapeJson(team.sectionId) << "\",";
         std::cout << "\n    \"sectionName\": \"" << escapeJson(team.sectionName) << "\",";
         
-        // Scores
         std::cout << "\n    \"sci_raw\": " << std::fixed << std::setprecision(2) << team.sci_raw << ",";
         std::cout << "\n    \"rep_raw\": " << team.rep_raw << ",";
         std::cout << "\n    \"opp_raw\": " << team.opp_raw << ",";
@@ -421,14 +352,13 @@ void outputJSON(std::vector<TeamData>& teams) {
         std::cout << "\n    \"opp\": " << team.opp << ",";
         std::cout << "\n    \"rev\": " << team.rev << ",";
         
-        // Calculated values
+        std::cout << "\n    \"rawTP\": " << team.rawTP << ",";
         std::cout << "\n    \"tp\": " << team.TP << ",";
         std::cout << "\n    \"rp\": " << team.RP << ",";
         std::cout << "\n    \"score\": " << team.RP << ",";
         std::cout << "\n    \"z_score\": " << std::setprecision(3) << team.z_score << ",";
         std::cout << "\n    \"leniency\": " << team.leniency << ",";
         
-        // Tasks
         std::cout << "\n    \"tasks\": [";
         for (size_t j = 0; j < team.grades.size(); j++) {
             if (j > 0) std::cout << ", ";
@@ -436,7 +366,6 @@ void outputJSON(std::vector<TeamData>& teams) {
         }
         std::cout << "],";
         
-        // Grades
         std::cout << "\n    \"grades\": [";
         for (size_t j = 0; j < team.grades.size(); j++) {
             if (j > 0) std::cout << ", ";
