@@ -49,14 +49,15 @@ if (!fs.existsSync(DATA_FILE)) {
 // Middleware
 const sessionMiddleware = session({
     secret: SESSION_SECRET,
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
     cookie: { 
-        secure: process.env.NODE_ENV === 'production',
+        secure: false,  // Changed: Railway uses proxy
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
         sameSite: 'lax'
-    }
+    },
+    proxy: true  // Added: Trust Railway's proxy
 });
 
 app.use(sessionMiddleware);
