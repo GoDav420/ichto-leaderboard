@@ -16,7 +16,7 @@ const double OPP_WEIGHT = 2.0;
 const double REV_WEIGHT = 1.0;
 const double LENIENCY_MIN = 0.6;
 const double LENIENCY_MAX = 1.5;
-const double LENIENCY_DAMPING = 0.7; // Only apply 50% of correction
+const double LENIENCY_DAMPING = 1.0; // Only apply 50% of correction
 
 // Grade conversion map
 std::map<std::string, double> GRADE_MAP = {
